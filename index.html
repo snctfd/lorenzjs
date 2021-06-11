@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>lorenz.js</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      import * as THREE from "https://cdn.skypack.dev/three@v0.129.0";
+      import { OrbitControls } from "https://cdn.skypack.dev/three@v0.129.0/examples/jsm/controls/OrbitControls.js";
+
+      let scene, camera, renderer, controls;
+      let pointGeom, pointsMat, points;
+      let linesGeom, linesMat, lines;
+
+      const rho = 28.0,
+        sigma = 10.0,
+        beta = 8.0 / 3,
+        dt = 0.001;
+      const numPoints = 200;
+      const lineTime = 3;
+      const lineLength = 200;
+      const vertices = [];
+      const paths = [];
+
+      function setup() {
+        // create numPoints randomly placed points, where each point has 3 components.
+        for (var i = 0; i < 3 * numPoints; i++) {
+          vertices.push(THREE.MathUtils.randFloatSpread(100));
+        }
+
+        for (var i = 0; i < numPoints; i++) {
+          const x = vertices[3*i];
+          const y = vertices[3*i + 1];
+          const z = vertices[3*i + 2];
+
+          const v = new THREE.Vector3(x, y, z);
+          paths.push([ v, v ]);
+        }
+
+        // create geometry objects
+        pointGeom = new THREE.BufferGeometry();
+        pointsMat = new THREE.PointsMaterial({ color: 0xff0000, size: 0.02 });
+        points = new THREE.Points(pointGeom, pointsMat);
+
+        linesGeom = new THREE.BufferGeometry().setFromPoints(paths.flat());
+        linesMat = new THREE.LineBasicMaterial({ color: 0x0000ff, size: 0.01 });
+        lines = new THREE.LineSegments(linesGeom, linesMat);
+
+        pointGeom.setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(vertices, 3)
+        );
+
+        // create and setup rendering objects
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(
+          75,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000
+        );
+        renderer = new THREE.WebGLRenderer();
+        controls = new OrbitControls(camera, renderer.domElement);
+
+        scene.add(points);
+        scene.add(lines);
+        camera.position.z = 2;
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        document.body.appendChild(renderer.domElement);
+      }
+
+      function render() {
+        requestAnimationFrame(render);
+
+        const pos = pointGeom.attributes.position;
+
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const y = pos.getY(i);
+          const z = pos.getZ(i);
+
+          const dx = dt * sigma * (y - x);
+          const dy = dt * (x * (rho - z) - y);
+          const dz = dt * (x*y - beta*z);
+
+          pos.setXYZ(i, x + dx, y + dy, z + dz);
+
+          const vOld = new THREE.Vector3(x, y, z);
+          const vNew = new THREE.Vector3(x + dx, y + dy, z + dz);
+          paths[i].push(vOld, vNew);
+
+          while (paths[i].length > 2 * lineLength) {
+            paths[i].shift();
+            paths[i].shift();
+          }
+        }
+
+        pointGeom.attributes.position.needsUpdate = true;
+
+        lines.geometry.dispose();
+        lines.geometry = new THREE.BufferGeometry().setFromPoints(paths.flat());
+
+        renderer.render(scene, camera);
+      }
+
+      setup();
+      render();
+    </script>
+
+    
+  </body>
+</html>
